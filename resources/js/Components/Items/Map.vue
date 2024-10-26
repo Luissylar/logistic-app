@@ -4,6 +4,10 @@
         <div v-if="duration" class="duration-info">
             Duración estimada: {{ duration }} minutos
         </div>
+        <div v-if="weather" class="weather-info border p-4 rounded-lg shadow-sm bg-blue-100 text-blue-900">
+            <p>Clima actual: <strong>{{ weather.description }}</strong></p>
+            <p>Temperatura: <strong>{{ weather.temp }} °C</strong></p>
+        </div>
     </div>
 </template>
 
@@ -59,6 +63,7 @@ const props = defineProps({
 
 let map;
 const duration = ref(null);
+const weather = ref(null);
 
 onMounted(() => {
     map = L.map("map").setView(
@@ -103,6 +108,7 @@ onMounted(() => {
                     [latitude, longitude],
                     [clientLatitude, clientLongitude]
                 );
+                fetchWeather(latitude, longitude);
             } else {
                 alert("Coordenadas del cliente no válidas.");
             }
@@ -127,27 +133,42 @@ onMounted(() => {
                 if (data.routes && data.routes.length > 0) {
                     const encodedRoute = data.routes[0].geometry;
                     const latLngs = decodePolyline(encodedRoute);
-
-                    // Dibujar la línea de la ruta
                     const routeLine = L.polyline(latLngs, {
                         color: "blue",
                         weight: 7,
                     }).addTo(map);
 
-                    // Ajustar el mapa para mostrar la ruta
                     map.fitBounds(routeLine.getBounds());
-
-                    // Extraer la duración
                     const durationInSeconds = data.routes[0].duration;
-                    duration.value = Math.round(durationInSeconds / 60); // Convertir a minutos
+                    duration.value = Math.round(durationInSeconds / 60);
                 } else {
-                    alert("No se pudo encontrar la ruta. Verifique las coordenadas.");
+                    alert(
+                        "No se pudo encontrar la ruta. Verifique las coordenadas."
+                    );
                 }
             })
             .catch((error) => {
                 console.error("Error al obtener la ruta:", error);
                 alert("Error al obtener la ruta: " + error.message);
             });
+    };
+
+    const fetchWeather = async (latitude, longitude) => {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`;
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error("Error al obtener el clima");
+            }
+            const data = await response.json();
+            weather.value = {
+                temp: data.current_weather.temperature,
+                description: data.current_weather.weathercode, 
+            };
+        } catch (error) {
+            console.error("Error al obtener el clima:", error);
+        }
     };
 });
 </script>
@@ -157,6 +178,11 @@ onMounted(() => {
     height: 100vh;
 }
 .duration-info {
+    margin-top: 10px;
+    font-size: 16px;
+    font-weight: bold;
+}
+.weather-info {
     margin-top: 10px;
     font-size: 16px;
     font-weight: bold;
