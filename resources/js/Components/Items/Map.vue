@@ -1,9 +1,14 @@
 <template>
-    <div id="map" style="height: 500px"></div>
+    <div>
+        <div id="map" style="height: 500px"></div>
+        <div v-if="duration" class="duration-info">
+            Duración estimada: {{ duration }} minutos
+        </div>
+    </div>
 </template>
 
 <script setup>
-import { onMounted, defineProps } from "vue";
+import { onMounted, defineProps, ref } from "vue";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
@@ -53,6 +58,7 @@ const props = defineProps({
 });
 
 let map;
+const duration = ref(null);
 
 onMounted(() => {
     map = L.map("map").setView(
@@ -92,6 +98,7 @@ onMounted(() => {
                     .addTo(map)
                     .bindPopup(`Orden para: ${props.order.client_name}`)
                     .openPopup();
+
                 drawRoute(
                     [latitude, longitude],
                     [clientLatitude, clientLongitude]
@@ -107,7 +114,7 @@ onMounted(() => {
     requestLocationPermission();
 
     const drawRoute = (start, end) => {
-        const routeUrl = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full`;
+        const routeUrl = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=polyline&steps=true&annotations=false`;
 
         fetch(routeUrl)
             .then((response) => {
@@ -119,17 +126,22 @@ onMounted(() => {
             .then((data) => {
                 if (data.routes && data.routes.length > 0) {
                     const encodedRoute = data.routes[0].geometry;
-                    const latLngs = decodePolyline(encodedRoute); 
+                    const latLngs = decodePolyline(encodedRoute);
 
+                    // Dibujar la línea de la ruta
                     const routeLine = L.polyline(latLngs, {
                         color: "blue",
-                        weight: 4,
+                        weight: 7,
                     }).addTo(map);
+
+                    // Ajustar el mapa para mostrar la ruta
                     map.fitBounds(routeLine.getBounds());
+
+                    // Extraer la duración
+                    const durationInSeconds = data.routes[0].duration;
+                    duration.value = Math.round(durationInSeconds / 60); // Convertir a minutos
                 } else {
-                    alert(
-                        "No se pudo encontrar la ruta. Verifique las coordenadas."
-                    );
+                    alert("No se pudo encontrar la ruta. Verifique las coordenadas.");
                 }
             })
             .catch((error) => {
@@ -143,5 +155,10 @@ onMounted(() => {
 <style scoped>
 #map {
     height: 100vh;
+}
+.duration-info {
+    margin-top: 10px;
+    font-size: 16px;
+    font-weight: bold;
 }
 </style>
